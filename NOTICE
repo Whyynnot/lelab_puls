@@ -1,0 +1,20 @@
+LeLab Puls community enhancements
+Copyright 2026 LeLab Puls contributors
+
+This distribution includes modified source from Hugging Face LeLab:
+https://github.com/huggingface/leLab
+Upstream baseline: 9b5afaee33baa1d773e499937564f3831d25de22
+Copyright notices in upstream files are preserved.
+
+Community modifications include configurable caches, LeRobot v0.7.0
+compatibility, training configuration import/editing, browser-controlled
+native inference, supported guided RTC selection, camera identity/preview
+handling, fault/stop feedback, and the optional PI05 FP8 deployment extension.
+See CHANGELOG.md for this distribution's modification summary.
+
+LeRobot is an external dependency, not a vendored source tree:
+https://github.com/huggingface/lerobot
+
+Bundled frontend assets, including the upstream SO-101 URDF and mesh files,
+retain their accompanying source and license notices. Dependencies, model
+weights and datasets are subject to their respective licenses.

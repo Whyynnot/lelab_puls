@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LeLab · PI05 FP8 推理与监控</title>
+<style>
+:root{color-scheme:dark;font:15px system-ui;background:#10151c;color:#e9eef6}
+body{max-width:1160px;margin:24px auto;padding:0 20px}a{color:#83c1ff}
+section{background:#1b2430;border:1px solid #354358;border-radius:12px;padding:20px;margin:18px 0}
+button,input,select,textarea{font:inherit;padding:9px;border-radius:6px;border:1px solid #56667c;background:#111923;color:#fff;margin:4px}
+button{cursor:pointer;background:#234b70}button:disabled{opacity:.45;cursor:default}
+button[aria-pressed=true]{background:#176b4e;border-color:#62c49d}.stop{background:#823d3d}
+textarea{width:96%;font:13px monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:340px;overflow:auto}
+label{display:inline-block}small,.muted{color:#a9bbce}#message,#hardware,#timing-hint{color:#ffd58a;white-space:pre-wrap}
+.views{display:grid;grid-template-columns:1fr 1fr;gap:16px}.views img{width:100%;max-height:300px;object-fit:contain;background:#0c1219;border-radius:8px}
+.metrics{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}.metrics span{background:#101923;padding:8px 12px;border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:right;padding:8px;border-bottom:1px solid #354358}td:first-child,th:first-child{text-align:left}
+canvas{width:100%;height:180px;background:#111923;border-radius:8px}summary{cursor:pointer;margin-top:12px}
+@media(max-width:700px){.views{grid-template-columns:1fr}td,th{padding:5px;font-size:11px}}
+</style>
+<a href="/">← LeLab：标定、遥操作与数据采集</a>
+<h1>PI05 FP8 推理与监控</h1>
+<p class="muted">原生 LeRobot · FP8 W8A8 · SO101 · head / wrist</p>
+<div id="message" role="status"></div>
+
+<section>
+<h2>1. 模型与推理模式</h2>
+<label>模型 <select id="profile"></select></label>
+<label>去噪步数 <input id="steps" type="number" min="1" max="50" value="10" style="width:60px"></label>
+<button id="load">加载模型</button><button id="unload">卸载模型</button><button id="test">离线观测测试</button>
+<p><button id="rtc" aria-pressed="false">RTC：关</button> <span id="mode-status">同步动作块</span></p>
+<small>RTC 开启：后台生成带前缀引导的新动作块，同时继续播放旧块。运行中可切换；切换时保持最后目标并丢弃旧请求结果，随后进入新模式。无需重载模型。</small>
+<p id="timing-hint"></p><p id="health">正在连接…</p>
+<details><summary>服务与离线测试详情</summary><pre id="health-details"></pre></details>
+</section>
+
+<section>
+<h2>2. 实时监控</h2>
+<label><input id="monitor-enabled" type="checkbox" checked>开启监控</label>
+<label><input id="images-enabled" type="checkbox" checked>显示画面</label>
+<small>最新快照，最多 2fps / 320×240。复用推理观测；后台压缩，不额外打开相机，不保存视频。隐藏页面后暂停。</small>
+<p id="monitor-status" class="muted">等待离线测试或真机推理。state 仅在推理采集观测时更新。</p>
+<div class="views"><div><p>头部 · head</p><img id="head" alt="等待头部推理观测" hidden></div><div><p>腕部 · wrist</p><img id="wrist" alt="等待腕部推理观测" hidden></div></div>
+<div id="metrics" class="metrics"></div>
+<table><thead><tr><th>关节</th><th>观测 state</th><th>已发送目标</th><th>预测块首项</th><th>预测块范围</th></tr></thead><tbody id="joints"></tbody></table>
+<p><label>关节曲线 <select id="chart-joint"></select></label> <small>蓝：观测；绿：已发送目标。旋转关节为 °，夹爪为 0–100。</small></p>
+<canvas id="chart" width="1000" height="180"></canvas>
+<details><summary>查看完整预测动作块和监控数据</summary><pre id="prediction"></pre></details>
+</section>
+
+<section>
+<h2>3. 从臂执行</h2>
+<p>先在首页完成标定，关闭采集、遥操作和预览。主臂用于采集，模型只控制从臂。</p>
+<label>从臂串口 <input id="port" placeholder="稳定 /dev/serial/by-id/… 路径"></label>
+<label>标定文件 <input id="calibration" value="" placeholder="从臂标定文件名"></label>
+<label>任务 <input id="task" value="" style="width:280px"></label>
+<label>时长 / 秒 <input id="duration" type="number" value="10" min="1" max="3600" style="width:65px"></label>
+<label>执行频率 / Hz <input id="fps" type="number" value="30" min="5" max="60" style="width:65px"></label>
+<p class="muted">频率在本次启动时生效。降低频率会放慢动作播放，需重新检查真机任务表现；RTC 的缓冲不足或请求超时会停止执行。</p>
+<textarea id="cameras" rows="5">{"head":{"type":"opencv","camera_index":0,"width":640,"height":480,"fps":30,"fourcc":"MJPG","rotation":0},"wrist":{"type":"opencv","camera_index":2,"width":640,"height":480,"fps":30,"fourcc":"MJPG","rotation":0}}</textarea>
+<small>本机两路 UVC 使用 MJPG。腕部相机在 640×480 的 YUYV 格式下最高为 25fps，不能要求该格式输出 30fps。</small>
+<p id="hardware">正在检查设备…</p>
+<button id="run" disabled>开始从臂推理</button><button id="stop" class="stop">停止从臂</button><pre id="robot"></pre>
+<p id="robot-status" role="status" aria-live="polite">正在确认从臂运行状态…</p>
+<small>停止从臂会结束动作执行，模型保持加载。需要释放显存时，再点击上方“卸载模型”。</small>
+</section>
+
+<section>
+<details><summary>模型配置（部署新模型时使用）</summary>
+<button id="edit">查看所选配置</button><button id="save">保存配置</button><textarea id="editor" rows="15" aria-label="模型配置 JSON"></textarea>
+</details>
+<details><summary>模型服务日志</summary><pre id="logs"></pre></details>
+<details><summary>机械臂日志</summary><pre id="rlogs"></pre></details>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const joints = ['shoulder_pan.pos','shoulder_lift.pos','elbow_flex.pos','wrist_flex.pos','wrist_roll.pos','gripper.pos'];
+const clientId = 'viewer_' + Math.random().toString(36).slice(2);
+let profiles = [], selectedMode = 'sync', serviceBusy = false, monitorBusy = false;
+let stopPending = false, statusGeneration = 0;
+let lastLease = 0, lastFrame = '', lastSequence = '', history = [];
+
+async function api(path, body, timeoutMs = 0) {
+  const options = body === undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  if (controller) options.signal = controller.signal;
+  try {
+    const response = await fetch('/api/deploy/' + path, options);
+    const data = await response.json();
+    if (!response.ok) throw Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') throw Error('后台停止请求超时，尚未确认任务退出；请检查 USB 状态后重试。');
+    throw error;
+  } finally { if (timer !== null) clearTimeout(timer); }
+}
+async function action(fn) {
+  try { $('message').textContent = ''; const value = await fn(); $('message').textContent = JSON.stringify(value,null,2); await refreshService(); }
+  catch (error) { $('message').textContent = error.message; }
+}
+async function loadProfiles() {
+  const old = $('profile').value;
+  const [available, status] = await Promise.all([api('profiles'), api('status')]);
+  profiles = available;
+  $('profile').replaceChildren(...profiles.map(profile => {
+    const option = document.createElement('option'); option.value = profile.name; option.textContent = profile.name; return option;
+  }));
+  const loaded = profiles.find(p => p.artifact === status.service.artifact);
+  $('profile').value = profiles.some(p => p.name === old) ? old : loaded?.name || profiles[0]?.name;
+  const selected = profiles.find(p => p.name === $('profile').value);
+  if (selected?.default_task) $('task').value = selected.default_task;
+}
+function showMode(mode) {
+  selectedMode = mode;
+  $('rtc').setAttribute('aria-pressed', String(mode === 'rtc'));
+  $('rtc').textContent = mode === 'rtc' ? 'RTC：开' : 'RTC：关';
+}
+async function refreshService() {
+  if (serviceBusy) return;
+  serviceBusy = true;
+  const generation = statusGeneration;
+  try {
+    const [status, hardware] = await Promise.all([api('status'),api('hardware-status')]);
+    if (generation !== statusGeneration) return;
+    $('health').textContent = status.service.running ? '模型已就绪 · FP8 W8A8 · '+status.service.steps+' 步去噪 · 原生 LeRobot' : '模型未就绪；请加载模型，或查看服务日志。';
+    $('health-details').textContent = JSON.stringify({service:status.service,offline_test:status.offline_test},null,2);
+    $('robot').textContent = JSON.stringify(status.rollout,null,2);
+    const active = status.rollout.inference_active;
+    $('stop').disabled = stopPending || !active;
+    $('stop').textContent = stopPending ? '正在停止…' : active ? '停止从臂' : '从臂已停止';
+    $('robot-status').textContent = stopPending ? '正在停止从臂，请等待后台确认…' : active ? '从臂正在推理。' : '从臂已停止。' + (status.service.running ? '模型仍已加载，可以再次启动；释放显存请点击“卸载模型”。' : '模型未加载。');
+    if (!stopPending && status.robot_stop?.error && active) $('robot-status').textContent = status.robot_stop.error;
+    else if (!stopPending && status.robot_stop?.fault) $('robot-status').textContent = '推理故障：' + status.robot_stop.fault + (active ? '；正在清理设备，暂不可启动新任务。' : '；任务已退出。');
+    $('logs').textContent = status.service_log; $('rlogs').textContent = status.robot_log;
+    showMode(status.control.mode);
+    $('mode-status').textContent = status.rollout.inference_active ? '运行中：请在监控中确认实际生效模式' : '已选择：' + (selectedMode === 'rtc' ? 'RTC 异步前缀引导' : '同步动作块');
+    const devices = hardware.current_devices || {};
+    const missing = ['follower','head','wrist'].filter(name => !devices[name]?.accessible);
+    $('hardware').textContent = missing.length ? '设备待恢复：' + missing.join('、') + '。离线测试仍可使用。' : '设备已枚举；启动前请确认两路实际画面、相机编号、安装方向及标定。';
+    if (!$('port').value && devices.follower?.accessible) $('port').value = devices.follower.path;
+    const calibration = hardware.runtime?.calibration_files?.follower || hardware.startup?.calibration_files?.follower;
+    if (!$('calibration').value && calibration) $('calibration').value = calibration;
+    const selected = profiles.find(p => p.name === $('profile').value);
+    $('run').disabled = stopPending || !selected?.allow_robot || !status.service.running || status.service.artifact !== selected.artifact || missing.length > 0 || status.rollout.inference_active || status.offline_test.state === 'running';
+    $('test').disabled = !status.service.running || status.rollout.inference_active || status.offline_test.state === 'running';
+    const milliseconds = status.offline_test.inference_ms;
+    if (milliseconds) {
+      const budget = Math.ceil(milliseconds*Number($('fps').value)/1000)+2;
+      $('timing-hint').textContent = '最近离线调用 ' + milliseconds.toFixed(0) + 'ms；RTC 估算延迟预算 ' + budget + ' 步。' + (2*budget+2 >= 50 ? '当前频率缓冲余量不足：接电复测或降低执行频率。' : '缓冲有初步余量，真机还受采集、预处理和系统抖动影响。');
+    }
+  } catch (error) { $('run').disabled = true; $('message').textContent = error.message; }
+  finally { serviceBusy = false; }
+}
+async function lease() {
+  const enabled = $('monitor-enabled').checked && !document.hidden;
+  await api('monitor',{client_id:clientId,enabled,images:$('images-enabled').checked});
+  lastLease = Date.now();
+}
+function metric(label, value) {
+  const span = document.createElement('span'); span.textContent = label + '：' + value; return span;
+}
+const number = value => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : '—';
+function render(snapshot) {
+  const age = snapshot.state_observed_at ? Math.max(0,Date.now()/1000-snapshot.state_observed_at).toFixed(1) : '—';
+  const source = snapshot.source?.startsWith('offline_') || snapshot.phase?.startsWith('offline_') ? '离线回放（不连接机械臂） · ' : '';
+  const phases = {idle:'尚未开始',initializing:'准备中',executing:'执行动作块',inference_with_playback:'后台推理与动作播放',inference_hold:'等待推理',mode_transition_hold:'切换模式并保持目标',stopped:'已停止',error_stopped:'出错后停止',offline_saved_observation:'离线观测测试',offline_benchmark:'离线性能测试'};
+  $('monitor-status').textContent = (snapshot.robot_active ? '从臂运行中 · ' : '从臂已停止 · ') + source + (snapshot.stale ? '历史快照 · ' : '') + (phases[snapshot.phase] || snapshot.phase || '尚未开始') + ' · 快照模式 ' + (snapshot.mode === 'rtc' ? 'RTC' : '同步') + ' · state 观测距今 ' + age + ' 秒' + (snapshot.error ? ' · ' + snapshot.error : '');
+  $('metrics').replaceChildren(metric('模型',number(snapshot.inference_ms)+' ms'),metric('请求及处理',number(snapshot.roundtrip_ms)+' ms'),metric('缓冲',snapshot.buffer_remaining ?? '—'),metric('已发送动作',snapshot.actions_sent ?? 0),metric('控制超期',snapshot.control_overruns ?? 0));
+  const chunk = snapshot.predicted_chunk || [];
+  $('joints').replaceChildren(...joints.map(name => {
+    const values = chunk.map(row => row[name]).filter(Number.isFinite);
+    const row = document.createElement('tr');
+    [name.replace('.pos',''),number(snapshot.state?.[name]),number(snapshot.target?.[name]),number(chunk[0]?.[name]),values.length ? number(Math.min(...values))+' ~ '+number(Math.max(...values)) : '—'].forEach(value => { const cell=document.createElement('td');cell.textContent=value;row.append(cell); });
+    return row;
+  }));
+  const sequence = snapshot.session + ':' + snapshot.sequence;
+  if (sequence !== lastSequence) {
+    history.push({state:snapshot.state || {},target:snapshot.target || {}});
+    if (history.length > 120) history.shift();
+    lastSequence = sequence;
+    drawChart();
+  }
+  const frame = snapshot.session + ':' + snapshot.image_version;
+  if (frame !== lastFrame && $('images-enabled').checked) {
+    for (const name of ['head','wrist']) {
+      $(name).hidden = !(snapshot.images || []).includes(name);
+      if (!$(name).hidden) $(name).src = '/api/deploy/monitor/'+name+'.jpg?v='+encodeURIComponent(frame);
+    }
+    lastFrame = frame;
+  }
+  $('prediction').textContent = JSON.stringify(snapshot,null,2);
+}
+function drawChart() {
+  const canvas = $('chart'), context = canvas.getContext('2d'), joint = $('chart-joint').value;
+  context.clearRect(0,0,canvas.width,canvas.height);
+  const values = history.flatMap(row => [row.state[joint],row.target[joint]]).filter(Number.isFinite);
+  if (!values.length) return;
+  const low = Math.min(...values)-1, high = Math.max(...values)+1;
+  context.fillStyle='#a9bbce';context.font='13px system-ui';context.fillText(high.toFixed(1),8,18);context.fillText(low.toFixed(1),8,170);
+  for (const [key,color] of [['state','#72b7ff'],['target','#62c49d']]) {
+    context.strokeStyle=color;context.lineWidth=2;context.beginPath();let active=false;
+    history.forEach((row,index) => { const value=row[key][joint];if (!Number.isFinite(value)){active=false;return;}const x=55+index/Math.max(1,history.length-1)*930,y=160-(value-low)/(high-low)*140;if(active)context.lineTo(x,y);else context.moveTo(x,y);active=true; });
+    context.stroke();
+  }
+}
+async function pollMonitor() {
+  if (monitorBusy || !$('monitor-enabled').checked || document.hidden) return;
+  monitorBusy = true;
+  try { if (Date.now()-lastLease > 2000) await lease();render(await api('monitor')); }
+  catch (error) { $('monitor-status').textContent = error.message; }
+  finally { monitorBusy = false; }
+}
+$('load').onclick = () => action(() => api('service/start',{profile:$('profile').value,steps:Number($('steps').value)}));
+$('unload').onclick = () => action(() => api('service/stop',{}));
+$('test').onclick = () => action(() => api('offline-test',{profile:$('profile').value,mode:selectedMode}));
+$('rtc').onclick = () => action(() => api('mode',{mode:selectedMode === 'rtc' ? 'sync' : 'rtc'}));
+$('run').onclick = () => action(() => api('robot/start',{profile:$('profile').value,follower_port:$('port').value,follower_config:$('calibration').value,cameras:JSON.parse($('cameras').value),task:$('task').value,duration_s:Number($('duration').value),control_fps:Number($('fps').value)}));
+async function stopRobot() {
+  if (stopPending) return;
+  stopPending = true; statusGeneration += 1;
+  $('stop').disabled = true; $('stop').textContent = '正在停止…'; $('run').disabled = true;
+  $('robot-status').textContent = '正在停止从臂，请等待后台确认…';
+  let confirmed = false;
+  try {
+    await api('robot/stop',{},15000);
+    const status = await api('status',undefined,5000);
+    if (status.rollout.inference_active) throw Error('后台仍报告从臂推理运行中');
+    confirmed = true;
+    $('message').textContent = '从臂推理已停止。' + (status.service.running ? '模型仍保持加载；需要释放显存请点击“卸载模型”。' : '');
+    $('robot-status').textContent = $('message').textContent;
+    const snapshot = await api('monitor',undefined,3000).catch(() => null);
+    if (snapshot) render(snapshot);
+  } catch (error) {
+    $('message').textContent = '停止尚未确认：' + error.message;
+    $('robot-status').textContent = $('message').textContent;
+  } finally {
+    stopPending = false; statusGeneration += 1;
+    $('stop').disabled = confirmed; $('stop').textContent = confirmed ? '从臂已停止' : '重试停止从臂';
+    await refreshService();
+  }
+}
+$('stop').onclick = stopRobot;
+$('edit').onclick = () => {$('editor').value=JSON.stringify(profiles.find(p=>p.name===$('profile').value),null,2);};
+$('save').onclick = () => action(async () => {const result=await api('profiles',JSON.parse($('editor').value));await loadProfiles();$('profile').value=result.saved;return result;});
+$('profile').onchange = () => {const selected=profiles.find(p=>p.name===$('profile').value);if(selected?.default_task)$('task').value=selected.default_task;refreshService();};
+$('fps').onchange = refreshService;
+$('monitor-enabled').onchange = () => {lease().catch(()=>{});if(!$('monitor-enabled').checked)$('monitor-status').textContent='监控已关闭；推理继续运行。';else pollMonitor();};
+$('images-enabled').onchange = () => {lastFrame='';for(const name of ['head','wrist'])$(name).hidden=true;lease().catch(()=>{});};
+document.addEventListener('visibilitychange',() => {lease().catch(()=>{});if(!document.hidden)pollMonitor();});
+for (const joint of joints) {const option=document.createElement('option');option.value=joint;option.textContent=joint.replace('.pos','');$('chart-joint').append(option);}
+$('chart-joint').onchange = drawChart;
+loadProfiles().then(refreshService).catch(error => $('message').textContent=error.message);
+lease().then(pollMonitor).catch(()=>{});
+setInterval(refreshService,2000);setInterval(pollMonitor,500);
+</script>
+</html>

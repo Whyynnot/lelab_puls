@@ -1,0 +1,26 @@
+{
+  "distribution": "LeLab Puls",
+  "publication_date": "2026-11-08",
+  "upstream_lelab": {
+    "repository": "https://github.com/huggingface/leLab",
+    "baseline_commit": "9b5afaee33baa1d773e499937564f3831d25de22",
+    "license": "Apache-2.0",
+    "modifications": "See CHANGELOG.md; includes committed and working-tree community improvements at export time."
+  },
+  "lerobot": {
+    "repository": "https://github.com/huggingface/lerobot",
+    "version": "0.7.0",
+    "tag": "v0.7.0",
+    "official_source_archive_sha256": "f1f3749ba9cf24f5e6ff0df71be4f267ac5193b09b0eb1a7ebb27301c5597588",
+    "source_changes_required": false,
+    "note": "Local motor tuning was excluded. Native guided RTC uses official release APIs."
+  },
+  "excluded": [
+    "Original private deployment Git history",
+    "Model weights and quantized artifacts",
+    "Datasets and observations",
+    "Authentication tokens and environment files",
+    "Calibration files and private hardware identities",
+    "Runtime state, logs and validation captures"
+  ]
+}

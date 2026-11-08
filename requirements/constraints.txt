@@ -1,0 +1,8 @@
+# Tested API combinations; use a fresh environment, not a system-wide freeze.
+torch==2.10.0
+torchvision==0.25.0
+torchcodec==0.10.0
+transformers==5.22.2
+rustypot==1.13.1
+numpy==2.2.6
+av==15.1.0

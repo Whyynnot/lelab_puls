@@ -1,0 +1,6 @@
+{
+  "leader": "/dev/serial/by-id/usb-YOUR_LEADER_SERIAL-if00",
+  "follower": "/dev/serial/by-id/usb-YOUR_FOLLOWER_SERIAL-if00",
+  "head": "/dev/v4l/by-id/usb-YOUR_HEAD_CAMERA-video-index0",
+  "wrist": "/dev/v4l/by-id/usb-YOUR_WRIST_CAMERA-video-index0"
+}

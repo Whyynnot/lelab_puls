@@ -1,0 +1,15 @@
+{
+  "name": "my_pi05_fp8",
+  "artifact": "/absolute/path/to/my_pi05_fp8",
+  "allow_robot": false,
+  "execution_horizon": 10,
+  "fps": 30,
+  "max_relative_target": 5.0,
+  "camera_map": {
+    "head": "observation.images.head",
+    "wrist": "observation.images.wrist"
+  },
+  "default_task": "REPLACE_WITH_TRAINING_TASK",
+  "sample_manifest": "validation/sample_manifest.json",
+  "note": "Configure checkpoint, camera keys, tokenizer and calibration before enabling robot execution."
+}
