@@ -25,7 +25,8 @@ docs/                    教程、架构及故障排查
 ```bash
 source .venv/bin/activate
 python -m pytest tests lelab/bridge lelab/src/tests/test_training_config.py \
-  lelab/src/tests/test_model_cache.py lelab/src/tests/test_rollout.py
+  lelab/src/tests/test_model_cache.py lelab/src/tests/test_rollout.py \
+  lelab/src/tests/test_hub_upload.py
 cd lelab/src/frontend
 npm test
 npx tsc --noEmit -p tsconfig.app.json
