@@ -50,3 +50,9 @@ def test_checksum_error_keeps_real_motor_detail_with_hint():
     error="ConnectionError: Failed to enable torque after 3 tries on 'shoulder_lift' (motor ID 2): Checksum error."
     assert '串口通信包校验失败' in _friendly_hint(error)
     assert _friendly_hint('ValueError: model checkpoint checksum mismatch') is None
+
+
+def test_web_entrypoint_installs_retries_for_in_process_device_setup():
+    import app
+    assert app.teleoperate is __import__('lelab.teleoperate', fromlist=['handle_start_teleoperation'])
+    assert getattr(SOFollower.configure, '_native_startup_retries', False)

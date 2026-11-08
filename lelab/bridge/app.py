@@ -19,6 +19,11 @@ from robot_stop import RobotStopper, StopBlocked
 from lelab.server import app
 from lelab import record, rollout, teleoperate
 from lelab import server as upstream_server
+from native_startup import install_startup_retries
+
+# Teleoperation and recording configure the follower in this web process;
+# native rollout installs the same bounded setup-only behavior in its child.
+install_startup_retries()
 
 HERE = Path(__file__).resolve().parent
 PROFILE_DIR, LOGS = ROOT/'lelab/profiles', ROOT/'lelab/logs'
