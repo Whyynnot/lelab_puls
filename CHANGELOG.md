@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-08 — Dataset upload recovery
+
+- Recognize the observed Xet upload-session ENOENT failure and retry the same dataset through an isolated HTTP/LFS worker.
+- Preserve the requested repository, privacy, tags and native LeRobot dataset card/version tag behavior. The parent process's model-download transport remains unchanged.
+- Keep actual missing-local-file, authentication and permanent upload failures visible; test child-process transport isolation and existing bounded transport retries.
+
 ## 2026-11-08 — Initial community source distribution
 
 - Export the working LeLab enhancements into a standalone repository, preserving upstream Apache-2.0 notices.
