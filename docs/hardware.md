@@ -49,6 +49,24 @@ Linux/WSL 用后端 `/api/deploy/cameras` 枚举 V4L2 设备，并通过独立�
 
 默认 `640×480 / 30 FPS / MJPG` 适合原开发环境的 UVC 相机；其他相机须选用自己支持的格式。输入图像旋转、相机语义和 checkpoint 特征名必须与训练一致。
 
+### 室内灯光频闪
+
+先用 `v4l2-ctl --device=/dev/v4l/by-id/YOUR_CAMERA --list-ctrls-menus` 查询相机实际支持的控制项（Ubuntu 可安装 `v4l-utils`）。不要把另一台相机的参数名或枚举值直接套用。
+
+在 50 Hz 照明环境下，可先设置 `power_line_frequency=1`。如果已是 50 Hz 仍有明暗闪烁，可尝试固定 20 ms 曝光并关闭动态帧率；运动模糊较明显时再比较 10 ms。这是需要现场观察的候选设置，不能保证消除所有 LED 调光/PWM 条纹。
+
+以下命令只适用于菜单与控制名匹配的相机，执行前停止录制/推理并保存原参数：
+
+```bash
+CAMERA=/dev/v4l/by-id/YOUR_CAMERA
+v4l2-ctl --device="$CAMERA" --get-ctrl=power_line_frequency,auto_exposure,exposure_time_absolute,exposure_dynamic_framerate
+v4l2-ctl --device="$CAMERA" --set-ctrl=power_line_frequency=1,exposure_dynamic_framerate=0
+v4l2-ctl --device="$CAMERA" --set-ctrl=auto_exposure=1
+v4l2-ctl --device="$CAMERA" --set-ctrl=exposure_time_absolute=200
+```
+
+这里 `auto_exposure=1` 须在该相机菜单中表示 Manual；曝光单位为 100 µs，因此 200 表示 20 ms、100 表示 10 ms，见 [Linux V4L2 相机控制文档](https://docs.kernel.org/userspace-api/media/v4l/ext-ctrls-camera.html)。改变曝光会影响亮度与运动模糊，采集前应检查是否匹配预期。控制值通常在打开/关闭采集设备时保留，但 USB 断电重插可能恢复默认，重连后请回读确认。
+
 ## 常见故障
 
 | 现象 | 含义及处理 |

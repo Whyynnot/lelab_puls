@@ -14,10 +14,11 @@ These checks validate the exported source tree, not the original working directo
 | Doctor: imports, native RTC API, cache path, frontend | Passed in the reference environment |
 | Isolated server on port 18081 | Health, built page, profiles, hardware status and camera inventory returned HTTP 200; server stopped afterwards |
 | Export review | No credential-pattern matches, symlinks or files over 5 MiB in the reviewed publication files |
+| Clean GitHub Ubuntu runner | Backend installation/regression and frontend job passed for code revision `acfc0db`; [run 42481399724](https://github.com/Whyynnot/lelab_puls/actions/runs/42481399724) |
 
 The backend rows overlap; their counts should not be added. The broader suite was interrupted after blocking inside native OpenCV video decoding in this WSL environment. No all-tests-passed claim is made for the complete inherited upstream suite. The two excluded modules are `test_datasets.py` and `test_episode_media.py`; their source remains available for further validation on other systems.
 
-Reference runtime: Python 3.12, LeRobot 0.7.0, Torch 2.10.0+cu126, Torchvision 0.25.0+cu126, TorchCodec 0.10.0, Transformers 5.22.2, Rustypot 1.13.1. Tests used the existing reference Python environment with imports explicitly directed to the exported repository. A complete multi-gigabyte Python installation on a clean host was not repeated. The npm install/build was performed cleanly against the committed lockfile.
+Reference runtime: Python 3.12, LeRobot 0.7.0, Torch 2.10.0+cu126, Torchvision 0.25.0+cu126, TorchCodec 0.10.0, Transformers 5.22.2, Rustypot 1.13.1. Local tests used the existing reference Python environment with imports explicitly directed to the exported repository. The GitHub runner additionally validated a clean CPU PyTorch installation, dependency resolution and selected regressions. A clean CUDA installation was not repeated. The npm install/build was performed cleanly against the committed lockfile.
 
 Dependency hygiene changes update compatible frontend packages, remove unused direct Zod, and override the typography parser to the fixed 6.1.5 line and the TypeScript ESLint minimatch dependency to 11.0.5+. Frontend tests/typecheck/build were repeated after these changes. Vite still reports a large bundle advisory and a legacy esbuild option warning; these are not build failures.
 
