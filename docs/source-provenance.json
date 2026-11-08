@@ -10,6 +10,7 @@
   "lerobot": {
     "repository": "https://github.com/huggingface/lerobot",
     "version": "0.7.0",
+    "installation": "Official PyPI lerobot==0.7.0, including policy extras",
     "tag": "v0.7.0",
     "official_source_archive_sha256": "f1f3749ba9cf24f5e6ff0df71be4f267ac5193b09b0eb1a7ebb27301c5597588",
     "source_changes_required": false,

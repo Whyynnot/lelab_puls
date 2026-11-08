@@ -12,5 +12,6 @@
 - Replace machine-specific cache paths and USB IDs with environment settings and local configuration examples; make Windows USB recovery opt-in.
 - Exclude model/data/calibration/token/runtime files and original private deployment history.
 - Add setup/build/doctor tooling, Chinese tutorials, English quick start, architecture diagrams and contribution instructions.
+- Use the official PyPI LeRobot 0.7.0 distribution consistently for core and policy extras, avoiding mixed Git/index dependency candidates during clean installation.
 
 Reference installation and selected no-hardware regression checks are recorded in docs/validation.md. No claim of universal robot or policy compatibility is made.
